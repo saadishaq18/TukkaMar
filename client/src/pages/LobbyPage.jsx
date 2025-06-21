@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import socket from '../socket';
+import DrawingBoard from '../components/DrawingBoard';
 
 function LobbyPage() {
   const { roomId } = useParams();
@@ -23,6 +24,7 @@ function LobbyPage() {
   }, [roomId, nickname]);
 
   return (
+    <>
     <div className="p-6">
       <h2 className="text-2xl font-bold">Room: {roomId}</h2>
       <h3 className="text-lg mt-4">Players:</h3>
@@ -32,6 +34,11 @@ function LobbyPage() {
         ))}
       </ul>
     </div>
+    <div className='mt-4'>
+        <DrawingBoard roomId={roomId} />
+
+    </div>
+    </>
   );
 }
 

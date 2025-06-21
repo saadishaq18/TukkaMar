@@ -46,6 +46,10 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('room_users', roomUsers)
   })
 
+  socket.on('drawing_data', ({roomId, x, y, type})=>{
+    io.to(roomId).emit('drawing_data', {x, y, type})
+  })
+
   socket.on('disconnect', () => {
     const user = users[socket.id]
     if(user){
