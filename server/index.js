@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
+const {rooms, startGame, setArtistWord, handleGuess, scheduleNextRound} = require('./gameManager')
 
 const app = express();
 const server = http.createServer(app);
@@ -28,11 +29,47 @@ io.on('connection', (socket) => {
     users[socket.id] = {nickname, roomId}
     socket.join(roomId)
 
-    const roomUsers = Object.entries(users)
-        .filter(([id, user])=> user.roomId === roomId)
-        .map(([id, user])=>({id, nickname: user.nickname}))
+    if(!rooms[roomId]){
+      rooms[roomId] = {players:[], artistIndex: -1}
+    }
 
-    io.to(roomId).emit('room_user', roomUsers)
+    const player = {id: socket.id, nickname}
+    rooms[roomId].players.push(player)
+
+    updateRoomUsers(roomId)
+
+    if(rooms[roomId].player.length >= 2){
+      const gameState = startGame(roomId) 
+      io.to(gameState.artist.id).emit('choose_word', gameState.wordOptions)
+      io.to(roomId).emit('round_start', {
+        artist: gameState.artist,
+        masked: gameState.masked
+      })
+    }
+
+    // const roomUsers = Object.entries(users)
+    //     .filter(([id, user])=> user.roomId === roomId)
+    //     .map(([id, user])=>({id, nickname: user.nickname}))
+
+    // io.to(roomId).emit('room_user', roomUsers)
+  })
+
+  socket.on('word_selected', ({roomId, word})=> {
+    setArtistWord(roomId, word)
+    io.to(roomId).emit('word_chosen', {masked: '_'.repeat(word.length)})
+  })
+
+  socket.on('guess_word', ({roomId, guess})=>{
+    const playerId = socket.id
+    const correct = handleGuess(roomId, playerId, guess)
+
+    if(correct){
+      socket.emit('guess_result', {correct: true})
+      io.to(roomId).emit('chat_message', {
+        sender: 'SYSTEM',
+        message: `${users[playerId].nickname} guessed the word correctly!`
+      })
+    }
   })
 
   socket.on('leave_room', ({roomId})=>{
@@ -44,6 +81,13 @@ io.on('connection', (socket) => {
     .map(([id, user])=> ({id, nickname: user.nickname}))
 
     io.to(roomId).emit('room_users', roomUsers)
+  })
+
+  socket.on('word_selected', ({roomId, word})=>{
+    setArtistWord(roomId, word)
+    io.to(roomId).emit('word_chosen', {masked: '_'.repeat(word.length) })
+
+    scheduleNextRound(io,roomId)
   })
 
   socket.on('drawing_data', ({roomId, x, y, type})=>{
